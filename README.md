@@ -137,6 +137,18 @@ Copy-Item target\release\statusline.exe "$env:USERPROFILE\.claude\ccline\statusl
 Create `config.toml` in `~/.claude/ccline/`:
 
 ```toml
+# Main configuration
+theme = "dark"
+first_run = false
+
+# JWT Token configuration (required for ranking feature)
+# To get your JWT token:
+# 1. Go to PackyCode website (https://www.packycode.com)
+# 2. Open browser DevTools (F12) -> Network tab
+# 3. Look for API requests and find your JWT token in the Authorization header
+# 4. Copy the token (without "Bearer " prefix) and paste it here
+jwt_token = "your_jwt_token_here"
+
 # Segment enable/disable
 [segments]
 model = true
@@ -246,8 +258,10 @@ Token usage percentage based on transcript analysis with smart context limit det
 ### Ranking System
 Customizable user levels based on:
 - Daily/monthly usage
-- Total spending
+- Total spending  
 - Custom metrics via API
+
+**Note:** The ranking feature requires a JWT token from PackyCode. See the Configuration section for setup instructions.
 
 ### Time Display
 Flexible time formatting:
