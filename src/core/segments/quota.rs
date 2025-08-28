@@ -1,9 +1,15 @@
-use super::Segment;
+use super::{Segment, RankingSegment};
 use crate::config::InputData;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
+use std::sync::{Arc, Mutex};
+
+// 全局缓存，避免重复 API 调用
+lazy_static::lazy_static! {
+    static ref API_CACHE: Arc<Mutex<Option<(UserApiResponse, SystemTime)>>> = Arc::new(Mutex::new(None));
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 struct ApiQuota {
@@ -13,26 +19,47 @@ struct ApiQuota {
     timestamp: SystemTime,
 }
 
+// API 响应结构 - 根据 packycode-cost 项目定义
+#[derive(Debug, Deserialize, Clone)]
+struct UserApiResponse {
+    #[serde(deserialize_with = "deserialize_string_to_f64")]
+    daily_budget_usd: f64,
+    #[serde(deserialize_with = "deserialize_string_to_f64")]
+    daily_spent_usd: f64,
+    #[serde(deserialize_with = "deserialize_string_to_f64")]
+    monthly_budget_usd: f64,
+    #[serde(deserialize_with = "deserialize_string_to_f64")]
+    monthly_spent_usd: f64,
+    opus_enabled: Option<bool>,
+}
+
+// 自定义反序列化函数，将字符串转换为 f64
+fn deserialize_string_to_f64<'de, D>(deserializer: D) -> Result<f64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de;
+    
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum StringOrFloat {
+        String(String),
+        Float(f64),
+    }
+    
+    match StringOrFloat::deserialize(deserializer)? {
+        StringOrFloat::String(s) => s.parse::<f64>()
+            .map_err(|_| de::Error::custom("Failed to parse string as f64")),
+        StringOrFloat::Float(f) => Ok(f),
+    }
+}
+
 #[derive(Debug, Deserialize)]
 struct AnthropicUsageResponse {
     #[serde(rename = "remaining_credit_in_usd")]
     remaining: f64,
     #[serde(rename = "credit_limit_in_usd")]
     limit: f64,
-}
-
-#[derive(Debug, Deserialize)]
-struct CustomApiUserInfo {
-    #[allow(dead_code)]
-    balance_usd: String,
-    #[allow(dead_code)]
-    total_spent_usd: String,
-    daily_budget_usd: String,
-    daily_spent_usd: Option<String>,
-    #[allow(dead_code)]
-    monthly_budget_usd: String,
-    #[allow(dead_code)]
-    monthly_spent_usd: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -56,6 +83,7 @@ pub struct QuotaSegment {
     api_key: Option<String>,
     base_url: String,
     info_url: Option<String>,
+    jwt_token: Option<String>,
 }
 
 impl QuotaSegment {
@@ -66,6 +94,18 @@ impl QuotaSegment {
             api_key,
             base_url,
             info_url,
+            jwt_token: None,
+        }
+    }
+
+    pub fn new_with_config(enabled: bool, jwt_token: Option<String>) -> Self {
+        let (api_key, base_url, info_url) = Self::load_api_config();
+        Self {
+            enabled,
+            api_key,
+            base_url,
+            info_url,
+            jwt_token,
         }
     }
 
@@ -119,49 +159,97 @@ impl QuotaSegment {
         dirs::home_dir().map(|home| home.join(".claude"))
     }
 
-    // Cache methods removed - no longer needed
+    // 获取用户信息 API 数据
+    fn fetch_user_info_api(api_key: &str, base_url: &str) -> Option<UserApiResponse> {
+        // 优先使用配置的 info_url
+        let (_, _, info_url) = Self::load_api_config();
+        
+        let url = if let Some(info_url) = info_url {
+            // 如果配置了 info_url，直接使用
+            info_url
+        } else if base_url.starts_with("https://share-api") {
+            // share-api 的情况，使用正确的端点
+            "https://share.packycode.com/api/backend/users/info".to_string()
+        } else if base_url.contains("packycode.com") {
+            // 公交车模式
+            format!("{}/api/backend/users/info", base_url)
+        } else {
+            // 默认处理
+            format!("{}/api/backend/users/info", base_url)
+        };
+        
+        let client = reqwest::blocking::Client::new();
+        let response = client
+            .get(&url)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .header("accept", "application/json")
+            .timeout(Duration::from_secs(2))
+            .send()
+            .ok()?;
 
-    fn fetch_quota(&self) -> Option<ApiQuota> {
-        // No cache - fetch fresh data every time
-        // Fetch from API
-        let api_key = self.api_key.as_ref()?;
+        if response.status().is_success() {
+            response.json().ok()
+        } else {
+            None
+        }
+    }
 
-        // If we have a custom info_url, use that instead
-        if let Some(info_url) = &self.info_url {
-            let client = reqwest::blocking::Client::new();
-            let response = client
-                .get(info_url)
-                .header("Authorization", format!("Bearer {}", api_key))
-                .header("accept", "*/*")
-                .header("content-type", "application/json")
-                .timeout(Duration::from_secs(5))
-                .send()
-                .ok()?;
+    // 共享的 API 获取函数，带缓存
+    fn fetch_user_info_cached() -> Option<UserApiResponse> {
+        const CACHE_DURATION: Duration = Duration::from_secs(30); // 30秒缓存
 
-            if response.status().is_success() {
-                let user_info: CustomApiUserInfo = response.json().ok()?;
-
-                // Parse the string values
-                let daily_budget = user_info.daily_budget_usd.parse::<f64>().unwrap_or(0.0);
-                let daily_spent = user_info
-                    .daily_spent_usd
-                    .and_then(|s| s.parse::<f64>().ok())
-                    .unwrap_or(0.0);
-
-                let quota = ApiQuota {
-                    remaining: daily_budget - daily_spent,
-                    total: daily_budget,
-                    used: daily_spent,
-                    timestamp: SystemTime::now(),
-                };
-
-                // No cache anymore
-
-                return Some(quota);
+        // 检查缓存
+        if let Ok(cache) = API_CACHE.lock() {
+            if let Some((cached_info, cached_time)) = cache.as_ref() {
+                if cached_time.elapsed().unwrap_or(CACHE_DURATION) < CACHE_DURATION {
+                    return Some(cached_info.clone());
+                }
             }
         }
 
+        // 缓存过期或不存在，重新获取
+        let (api_key, base_url, _) = Self::load_api_config();
+        let api_key = api_key?;
+        
+        // 使用统一的 backend/users/info API
+        let user_info = Self::fetch_user_info_api(&api_key, &base_url)?;
+        
+        // 更新缓存
+        if let Ok(mut cache) = API_CACHE.lock() {
+            *cache = Some((user_info.clone(), SystemTime::now()));
+        }
+        
+        Some(user_info)
+    }
+
+    fn fetch_quota(&self) -> Option<ApiQuota> {
+        // 使用统一的 backend/users/info API
+        if let Some(ref api_key) = self.api_key {
+            if let Some(user_info) = Self::fetch_user_info_api(api_key, &self.base_url) {
+                // 直接使用 API 返回的数据
+                let quota = ApiQuota {
+                    remaining: user_info.daily_budget_usd - user_info.daily_spent_usd,
+                    total: user_info.daily_budget_usd,
+                    used: user_info.daily_spent_usd,
+                    timestamp: SystemTime::now(),
+                };
+                return Some(quota);
+            }
+        }
+        
+        // 使用缓存的 API 调用（回退方案）
+        if let Some(user_info) = Self::fetch_user_info_cached() {
+            let quota = ApiQuota {
+                remaining: user_info.daily_budget_usd - user_info.daily_spent_usd,
+                total: user_info.daily_budget_usd,
+                used: user_info.daily_spent_usd,
+                timestamp: SystemTime::now(),
+            };
+            return Some(quota);
+        }
+
         // Fallback to standard Anthropic API
+        let api_key = self.api_key.as_ref()?;
         let url = if self.base_url.contains("api.anthropic.com") {
             format!("{}/v1/dashboard/usage", self.base_url)
         } else {
@@ -170,7 +258,7 @@ impl QuotaSegment {
         };
 
         let client = reqwest::blocking::Client::new();
-        let mut request = client.get(&url).timeout(Duration::from_secs(5));
+        let mut request = client.get(&url).timeout(Duration::from_secs(2));
 
         // Handle different auth header formats based on the endpoint
         if self.base_url.contains("api.anthropic.com") {
@@ -196,8 +284,6 @@ impl QuotaSegment {
                 timestamp: SystemTime::now(),
             };
 
-            // No cache anymore
-
             Some(quota)
         } else {
             None
@@ -205,8 +291,57 @@ impl QuotaSegment {
     }
 
     fn format_quota(&self, quota: &ApiQuota) -> String {
-        // For daily spent display
-        format!("Today: ${:.2}", quota.used)
+        // 显示今日花费金额
+        let daily_spent = quota.used;
+
+        // Choose emoji based on spending amount
+        let emoji = if daily_spent < 5.0 {
+            "💚" // Green - very low spending
+        } else if daily_spent < 15.0 {
+            "💛" // Yellow - moderate spending
+        } else if daily_spent < 30.0 {
+            "🧡" // Orange - high spending
+        } else {
+            "❤️" // Red - very high spending
+        };
+
+        // 尝试获取排名信息和垃圾话
+        let ranking_info = self.get_ranking_info();
+
+        // 格式化显示：emoji Today: $花费 排名图标 排名数字 | 垃圾话
+        if let Some((rank_display, talk, _gap_info)) = ranking_info {
+            format!("{} Today: ${:.2} {} | {}", emoji, daily_spent, rank_display, talk)
+        } else {
+            format!("{} Today: ${:.2}", emoji, daily_spent)
+        }
+    }
+
+    fn get_ranking_info(&self) -> Option<(String, String, Option<String>)> {
+        // 创建一个临时的RankingSegment来获取排名信息，传入JWT token
+        let ranking_segment = RankingSegment::new_with_token(true, self.jwt_token.clone());
+        if let Some((rank, total)) = ranking_segment.get_current_ranking() {
+            // 根据排名选择图标和颜色
+            let (icon, color) = match rank {
+                1 => ("🥇", "\x1b[33m"), // 金色
+                2 => ("🥈", "\x1b[37m"), // 银色
+                3 => ("🥉", "\x1b[31m"), // 铜色
+                _ => ("📊", "\x1b[36m"), // 青色
+            };
+
+            let rank_display = format!("{} {}{}\x1b[0m", icon, color, rank);
+            let trash_talk = RankingSegment::get_trash_talk_by_rank(rank, total).to_string();
+
+            // 获取与上一名的差距
+            let gap_info = if rank > 1 {
+                ranking_segment.get_gap_to_previous()
+            } else {
+                None
+            };
+
+            Some((rank_display, trash_talk, gap_info))
+        } else {
+            None
+        }
     }
 }
 

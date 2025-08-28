@@ -1,4 +1,4 @@
-# CCometixLine
+# Statusline
 
 基于 Rust 的高性能 Claude Code 状态栏工具，集成 Git 信息和实时使用量跟踪。
 

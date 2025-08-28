@@ -39,6 +39,11 @@ impl GitSegment {
     fn get_git_info(&self, working_dir: &str) -> Option<GitInfo> {
         let sanitized_dir = self.sanitize_path(working_dir);
 
+        // First check if we're in a git repository
+        if !self.is_git_repository(&sanitized_dir) {
+            return None;
+        }
+
         let branch = self
             .get_branch(&sanitized_dir)
             .unwrap_or_else(|| "detached".to_string());
@@ -83,6 +88,18 @@ impl GitSegment {
                 )
             })
             .collect()
+    }
+
+    fn is_git_repository(&self, working_dir: &str) -> bool {
+        let output = Command::new("git")
+            .args(["rev-parse", "--git-dir"])
+            .current_dir(working_dir)
+            .output();
+
+        match output {
+            Ok(output) => output.status.success(),
+            Err(_) => false,
+        }
     }
 
     fn get_branch(&self, working_dir: &str) -> Option<String> {
@@ -175,8 +192,8 @@ impl GitSegment {
     fn format_git_status(&self, info: &GitInfo) -> String {
         let mut parts = Vec::new();
 
-        // Branch name with circle icon
-        parts.push(format!("◐ {}", info.branch));
+        // Branch name with emoji icon
+        parts.push(format!("🌿 {}", info.branch));
 
         // Status indicators using simple Unicode symbols
         match info.status {

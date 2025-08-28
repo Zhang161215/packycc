@@ -2,13 +2,17 @@
 name = "ccometixline"
 version = "0.1.0"
 edition = "2021"
-description = "CCometixLine (ccline) - High-performance Claude Code StatusLine tool written in Rust"
+description = "statusline - High-performance Claude Code StatusLine tool written in Rust"
 authors = ["CCometixLine Contributors"]
 license = "MIT"
 repository = "https://github.com/username/CCometixLine"
 readme = "README.md"
 keywords = ["claude", "statusline", "powerline", "rust", "claude-code"]
 categories = ["command-line-utilities", "development-tools"]
+
+[[bin]]
+name = "statusline"
+path = "src/main.rs"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
@@ -17,3 +21,11 @@ clap = { version = "4.0", features = ["derive"] }
 toml = "0.8"
 reqwest = { version = "0.11", features = ["blocking", "json"] }
 dirs = "5.0"
+chrono = "0.4"
+lazy_static = "1.4"
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["fileapi", "winbase", "processenv"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"

@@ -17,7 +17,7 @@ impl Segment for ModelSegment {
             return String::new();
         }
 
-        format!("● {}", self.format_model_name(&input.model.display_name))
+        format!("🤖 {}", self.format_model_name(&input.model.display_name))
     }
 
     fn enabled(&self) -> bool {

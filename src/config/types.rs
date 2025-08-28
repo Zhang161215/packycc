@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 pub struct Config {
     pub theme: String,
     pub segments: SegmentsConfig,
+    pub first_run: bool,
+    pub jwt_token: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -13,6 +15,11 @@ pub struct SegmentsConfig {
     pub model: bool,
     pub usage: bool,
     pub quota: bool,
+    pub time: bool,
+    pub emoji: bool,
+    pub spinner: bool,
+    pub network: bool,
+    pub ranking: bool,
 }
 
 // Data structures compatible with existing main.rs

@@ -30,7 +30,7 @@ impl Segment for UsageSegment {
             context_used_token.to_string()
         };
 
-        format!("◔ {:.1}% · {} tokens", context_used_rate, tokens_display)
+        format!("📊 {:.1}% · {} tokens", context_used_rate, tokens_display)
     }
 
     fn enabled(&self) -> bool {

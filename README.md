@@ -11,7 +11,7 @@ A high-performance Claude Code statusline tool written in Rust with Git integrat
 
 ![PackyCC](assets/img1.png)
 
-The statusline shows: Model | Directory | Git Branch Status | Context Window | Daily Spent
+The statusline shows: Model | Directory | Git Branch Status | Context Window | Daily Spent | Network Latency | Opus Status
 
 ## Features
 
@@ -32,40 +32,40 @@ Download from [Releases](https://github.com/petiky/packycc/releases):
 
 ```bash
 mkdir -p ~/.claude/ccline
-wget https://github.com/petiky/packycc/releases/latest/download/ccline-linux-x64.tar.gz
-tar -xzf ccline-linux-x64.tar.gz
-cp ccline ~/.claude/ccline/
-chmod +x ~/.claude/ccline/ccline
+wget "<your-linux-artifact-url>" -O statusline-linux-x64.tar.gz
+tar -xzf statusline-linux-x64.tar.gz
+cp statusline ~/.claude/ccline/statusline
+chmod +x ~/.claude/ccline/statusline
 ```
 
 ### macOS (Intel)
 
 ```bash  
 mkdir -p ~/.claude/ccline
-wget https://github.com/petiky/packycc/releases/latest/download/ccline-macos-x64.tar.gz
-tar -xzf ccline-macos-x64.tar.gz
-cp ccline ~/.claude/ccline/
-chmod +x ~/.claude/ccline/ccline
+wget "<your-macos-x64-artifact-url>" -O statusline-macos-x64.tar.gz
+tar -xzf statusline-macos-x64.tar.gz
+cp statusline ~/.claude/ccline/statusline
+chmod +x ~/.claude/ccline/statusline
 ```
 
 ### macOS (Apple Silicon)
 
 ```bash
 mkdir -p ~/.claude/ccline  
-wget https://github.com/petiky/packycc/releases/latest/download/ccline-macos-arm64.tar.gz
-tar -xzf ccline-macos-arm64.tar.gz
-cp ccline ~/.claude/ccline/
-chmod +x ~/.claude/ccline/ccline
+wget "<your-macos-arm64-artifact-url>" -O statusline-macos-arm64.tar.gz
+tar -xzf statusline-macos-arm64.tar.gz
+cp statusline ~/.claude/ccline/statusline
+chmod +x ~/.claude/ccline/statusline
 ```
 
 ### Windows
 
 ```powershell
 # Create directory and download
-New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.claude\ccline"
-Invoke-WebRequest -Uri "https://github.com/Haleclipse/CCometixLine/releases/latest/download/ccline-windows-x64.zip" -OutFile "ccline-windows-x64.zip"
-Expand-Archive -Path "ccline-windows-x64.zip" -DestinationPath "."
-Move-Item "ccline.exe" "$env:USERPROFILE\.claude\ccline\"
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.claude\ccline" | Out-Null
+Invoke-WebRequest -Uri "<your-windows-x64-artifact-url>" -OutFile "statusline-windows-x64.zip"
+Expand-Archive -Path "statusline-windows-x64.zip" -DestinationPath "."
+Move-Item "statusline.exe" "$env:USERPROFILE\.claude\ccline\" -Force
 ```
 
 ### Claude Code Configuration
@@ -77,7 +77,7 @@ Add to your Claude Code `settings.json`:
 {
   "statusLine": {
     "type": "command", 
-    "command": "~/.claude/ccline/ccline",
+    "command": "~/.claude/ccline/statusline",
     "padding": 0
   }
 }
@@ -88,7 +88,7 @@ Add to your Claude Code `settings.json`:
 {
   "statusLine": {
     "type": "command", 
-    "command": "%USERPROFILE%\\.claude\\ccline\\ccline.exe",
+    "command": "%USERPROFILE%\\.claude\\ccline\\statusline.exe",
     "padding": 0
   }
 }
@@ -103,33 +103,33 @@ cargo build --release
 
 # Linux/macOS
 mkdir -p ~/.claude/ccline
-cp target/release/ccometixline ~/.claude/ccline/ccline
-chmod +x ~/.claude/ccline/ccline
+cp target/release/statusline ~/.claude/ccline/statusline
+chmod +x ~/.claude/ccline/statusline
 
 # Windows (PowerShell)
-New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.claude\ccline"
-copy target\release\ccometixline.exe "$env:USERPROFILE\.claude\ccline\ccline.exe"
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.claude\ccline" | Out-Null
+Copy-Item target\release\statusline.exe "$env:USERPROFILE\.claude\ccline\statusline.exe" -Force
 ```
 
 ## Usage
 
 ```bash
 # Basic usage (displays all enabled segments)
-ccline
+statusline
 
 # Show help
-ccline --help
+statusline --help
 
 # Print default configuration  
-ccline --print-config
+statusline --print-config
 
 # TUI configuration mode (planned)
-ccline --configure
+statusline --configure
 ```
 
 ## Default Segments
 
-Displays: `Model | Directory | Git Branch Status | Context Window | Today: $X.XX`
+Displays: `Model | Directory | Git Branch Status | Context Window | Today: $X.XX | Network Latency | Opus Status`
 
 ### Git Status Indicators
 
@@ -152,6 +152,13 @@ Token usage percentage based on transcript analysis with context limit tracking.
 
 Shows daily API spending from PackyCode API when configured in `~/.config/claude/settings.json`.
 
+### Opus Status Display
+
+Shows whether Opus model access is enabled for your account:
+- `✅ Opus` - Opus access is enabled
+- `❌ No Opus` - Opus access is disabled
+- `❓ Opus: N/A` - Status unknown (API error or not configured)
+
 ## Configuration
 
 For PackyCode API integration, add to `~/.config/claude/settings.json`:
@@ -165,6 +172,18 @@ For PackyCode API integration, add to `~/.config/claude/settings.json`:
   "info_url": "https://www.packycode.com/api/backend/users/info"
 }
 ```
+
+### API Response Format
+
+The PackyCode API (`https://www.packycode.com/api/backend/users/info`) now returns the following fields:
+
+- `balance_usd`: Current account balance
+- `total_spent_usd`: Total amount spent
+- `daily_budget_usd`: Daily spending budget
+- `daily_spent_usd`: Amount spent today
+- `monthly_budget_usd`: Monthly spending budget
+- `monthly_spent_usd`: Amount spent this month
+- `opus_enabled`: Whether Opus model access is enabled (boolean)
 
 ## Performance
 

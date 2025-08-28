@@ -19,7 +19,8 @@ impl Segment for DirectorySegment {
         }
 
         let dir_name = get_current_dir_name(&input.workspace.current_dir);
-        format!("○ {}", dir_name)
+        // 返回纯目录名，由状态栏统一添加图标与着色
+        format!("{}", dir_name)
     }
 
     fn enabled(&self) -> bool {
