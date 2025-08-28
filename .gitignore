@@ -5,3 +5,18 @@ claude-powerline-features.md
 CLAUDE.md
 PRD.md
 .claude/
+
+# Sensitive configuration files
+config.toml
+*.jwt
+*.key
+*.token
+*credentials*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+nul
