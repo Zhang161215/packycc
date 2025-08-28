@@ -1,35 +1,57 @@
 # PackyCC
 
-A high-performance Claude Code statusline tool written in Rust with Git integration, real-time usage tracking, and API quota monitoring.
+A high-performance Claude Code statusline tool written in Rust with Git integration, real-time usage tracking, API quota monitoring, and customizable segments.
 
-> Fork of [CCometixLine](https://github.com/Haleclipse/CCometixLine) with added PackyCode API integration and real-time quota monitoring.
+> Fork of [CCometixLine](https://github.com/Haleclipse/CCometixLine) with added PackyCode API integration, real-time quota monitoring, and extensive customization options.
 
 ![Language:Rust](https://img.shields.io/static/v1?label=Language&message=Rust&color=orange&style=flat-square)
 ![License:MIT](https://img.shields.io/static/v1?label=License&message=MIT&color=blue&style=flat-square)
 
 ## Screenshots
 
-![PackyCC](assets/img1.png)
+![PackyCC](assets/screenshot.png)
 
-The statusline shows: Model | Directory | Git Branch Status | Context Window | Daily Spent | Network Latency | Opus Status
+The statusline shows: Model | Directory | Git Status | Context Window | Daily Spent | Emoji | Ranking | Time | Network | Spinner
 
 ## Features
 
-- **High performance** with Rust native speed
+### Core Features
+- **High performance** with Rust native speed (<50ms startup time)
 - **Git integration** with branch, status, and tracking info  
 - **Model display** with simplified Claude model names
 - **Usage tracking** based on transcript analysis
 - **API quota monitoring** showing daily spending from PackyCode API
-- **Directory display** showing current workspace
-- **Clean design** with customizable icons
-- **Simple configuration** via command line options
+- **Directory display** with smart path truncation
+- **Opus status display** showing model access availability
+
+### New Segments (Customizable)
+- **🎨 Emoji Segment** - Display custom emojis with configurable cycle intervals
+- **🏆 Ranking Segment** - Show user rank/level based on usage or custom metrics
+- **⏰ Time Segment** - Display current time in various formats (12/24 hour, with/without seconds)
+- **🌐 Network Segment** - Monitor network connectivity status
+- **⚡ Spinner Segment** - Animated loading indicators for ongoing operations
+
+### Customization
+- **TOML Configuration** - Full configuration via `config.toml` file
+- **Segment Toggle** - Enable/disable any segment
+- **Custom Colors** - Configure colors for each segment
+- **Icon Customization** - Use custom icons or disable them
+- **Layout Control** - Choose segment order and separators
 
 ## Installation
 
-Download from [Releases](https://github.com/petiky/packycc/releases):
+### Quick Install (Windows)
 
-### Linux
+Run the provided install script:
+```powershell
+.\install.bat
+```
 
+### Manual Installation
+
+Download from [Releases](https://github.com/zhangjintao950326/packycc/releases):
+
+#### Linux
 ```bash
 mkdir -p ~/.claude/ccline
 wget "<your-linux-artifact-url>" -O statusline-linux-x64.tar.gz
@@ -38,8 +60,7 @@ cp statusline ~/.claude/ccline/statusline
 chmod +x ~/.claude/ccline/statusline
 ```
 
-### macOS (Intel)
-
+#### macOS (Intel)
 ```bash  
 mkdir -p ~/.claude/ccline
 wget "<your-macos-x64-artifact-url>" -O statusline-macos-x64.tar.gz
@@ -48,8 +69,7 @@ cp statusline ~/.claude/ccline/statusline
 chmod +x ~/.claude/ccline/statusline
 ```
 
-### macOS (Apple Silicon)
-
+#### macOS (Apple Silicon)
 ```bash
 mkdir -p ~/.claude/ccline  
 wget "<your-macos-arm64-artifact-url>" -O statusline-macos-arm64.tar.gz
@@ -58,8 +78,7 @@ cp statusline ~/.claude/ccline/statusline
 chmod +x ~/.claude/ccline/statusline
 ```
 
-### Windows
-
+#### Windows
 ```powershell
 # Create directory and download
 New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.claude\ccline" | Out-Null
@@ -97,7 +116,7 @@ Add to your Claude Code `settings.json`:
 ### Build from Source
 
 ```bash
-git clone https://github.com/petiky/packycc.git
+git clone https://github.com/zhangjintao950326/packycc.git
 cd packycc
 cargo build --release
 
@@ -111,55 +130,68 @@ New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.claude\ccline" | Ou
 Copy-Item target\release\statusline.exe "$env:USERPROFILE\.claude\ccline\statusline.exe" -Force
 ```
 
-## Usage
+## Configuration
 
-```bash
-# Basic usage (displays all enabled segments)
-statusline
+### Basic Configuration
 
-# Show help
-statusline --help
+Create `config.toml` in `~/.claude/ccline/`:
 
-# Print default configuration  
-statusline --print-config
+```toml
+# Segment enable/disable
+[segments]
+model = true
+directory = true
+git = true
+usage = true
+quota = true
+emoji = true
+ranking = true
+time = true
+network = true
+spinner = false
 
-# TUI configuration mode (planned)
-statusline --configure
+# Emoji segment configuration
+[emoji]
+enabled = true
+emojis = ["🚀", "✨", "🎯", "🔥", "⚡", "💫", "🌟", "💎"]
+cycle_seconds = 60  # Change emoji every 60 seconds
+
+# Ranking segment configuration
+[ranking]
+enabled = true
+levels = [
+    { threshold = 0, label = "Novice", icon = "🌱" },
+    { threshold = 100, label = "Apprentice", icon = "⚔️" },
+    { threshold = 500, label = "Expert", icon = "🏆" },
+    { threshold = 1000, label = "Master", icon = "👑" },
+    { threshold = 5000, label = "Legend", icon = "🔮" }
+]
+
+# Time segment configuration
+[time]
+enabled = true
+format_24h = true
+show_seconds = false
+use_icon = true
+
+# Network segment configuration
+[network]
+enabled = true
+check_interval = 30  # Check every 30 seconds
+timeout = 5000       # 5 second timeout
+
+# Directory segment configuration
+[directory]
+max_length = 30
+use_icon = true
+
+# Git segment configuration
+[git]
+show_remote = true
+use_icons = true
 ```
 
-## Default Segments
-
-Displays: `Model | Directory | Git Branch Status | Context Window | Today: $X.XX | Network Latency | Opus Status`
-
-### Git Status Indicators
-
-- Branch name with Nerd Font icon
-- Status: `✓` Clean, `●` Dirty, `⚠` Conflicts  
-- Remote tracking: `↑n` Ahead, `↓n` Behind
-
-### Model Display
-
-Shows simplified Claude model names:
-- `claude-3-5-sonnet` → `Sonnet 3.5`
-- `claude-4-sonnet` → `Sonnet 4`
-- `claude-4-1-opus` → `Opus 4.1`
-
-### Context Window Display
-
-Token usage percentage based on transcript analysis with context limit tracking.
-
-### API Quota Display
-
-Shows daily API spending from PackyCode API when configured in `~/.config/claude/settings.json`.
-
-### Opus Status Display
-
-Shows whether Opus model access is enabled for your account:
-- `✅ Opus` - Opus access is enabled
-- `❌ No Opus` - Opus access is disabled
-- `❓ Opus: N/A` - Status unknown (API error or not configured)
-
-## Configuration
+### PackyCode API Configuration
 
 For PackyCode API integration, add to `~/.config/claude/settings.json`:
 
@@ -173,28 +205,79 @@ For PackyCode API integration, add to `~/.config/claude/settings.json`:
 }
 ```
 
-### API Response Format
+## Usage
 
-The PackyCode API (`https://www.packycode.com/api/backend/users/info`) now returns the following fields:
+```bash
+# Basic usage (displays all enabled segments)
+statusline
 
-- `balance_usd`: Current account balance
-- `total_spent_usd`: Total amount spent
-- `daily_budget_usd`: Daily spending budget
-- `daily_spent_usd`: Amount spent today
-- `monthly_budget_usd`: Monthly spending budget
-- `monthly_spent_usd`: Amount spent this month
-- `opus_enabled`: Whether Opus model access is enabled (boolean)
+# Show help
+statusline --help
+
+# Print current configuration  
+statusline --print-config
+
+# Use custom config file
+statusline --config /path/to/config.toml
+
+# Enable/disable segments via command line
+statusline --no-emoji --no-ranking
+
+# Force specific display mode
+statusline --mode compact
+```
+
+## Segment Details
+
+### Model Display
+Shows simplified Claude model names:
+- `claude-3-5-sonnet` → `Sonnet 3.5`
+- `claude-4-sonnet` → `Sonnet 4`
+- `claude-4-1-opus` → `Opus 4.1`
+
+### Git Status Indicators
+- Branch name with Nerd Font icon
+- Status: `✓` Clean, `●` Dirty, `⚠` Conflicts  
+- Remote tracking: `↑n` Ahead, `↓n` Behind
+
+### Context Window Display
+Token usage percentage based on transcript analysis with smart context limit detection.
+
+### Ranking System
+Customizable user levels based on:
+- Daily/monthly usage
+- Total spending
+- Custom metrics via API
+
+### Time Display
+Flexible time formatting:
+- 12/24 hour format
+- Optional seconds display
+- Custom time zones (planned)
+
+### Network Status
+Real-time network monitoring:
+- `🟢` Connected
+- `🔴` Disconnected  
+- `🟡` Limited connectivity
+
+### Emoji Rotation
+Configurable emoji display:
+- Custom emoji lists
+- Adjustable rotation intervals
+- Category-based selections
 
 ## Performance
 
 - **Startup time**: < 50ms (vs ~200ms for TypeScript equivalents)
 - **Memory usage**: < 10MB (vs ~25MB for Node.js tools)
 - **Binary size**: ~2MB optimized release build
+- **Update frequency**: Real-time with minimal CPU usage
 
 ## Requirements  
 
 - Git (optional, for git integration)  
-- Terminal with Nerd Font support
+- Terminal with Nerd Font support (recommended)
 - Claude Code for statusline integration
 
 ## Development
@@ -208,24 +291,42 @@ cargo test
 
 # Build optimized release
 cargo build --release
+
+# Run with debug output
+RUST_LOG=debug cargo run
+
+# Benchmark performance
+cargo bench
 ```
 
 ## Roadmap
 
-- [ ] TOML configuration file support
+- [x] TOML configuration file support
+- [x] Custom emoji segment
+- [x] Ranking/level system
+- [x] Time display segment
+- [x] Network status monitoring
 - [ ] TUI configuration interface
-- [ ] Custom themes
-- [ ] Plugin system
-- [ ] Cross-platform binaries
+- [ ] Custom themes and color schemes
+- [ ] Plugin system for custom segments
+- [ ] WebSocket support for real-time updates
+- [ ] Multi-language support
 
 ## Contributing
 
 Contributions are welcome! Please feel free to submit issues or pull requests.
 
+### Development Guidelines
+1. Follow Rust best practices
+2. Add tests for new features
+3. Update documentation
+4. Run `cargo fmt` and `cargo clippy` before submitting
+
 ## Credits
 
 - Original project: [CCometixLine](https://github.com/Haleclipse/CCometixLine) by Haleclipse
 - PackyCode API integration and enhancements by [petiky](https://github.com/petiky)
+- Extended features and customization by [zhangjintao950326](https://github.com/zhangjintao950326)
 
 ## License
 
@@ -233,4 +334,4 @@ This project is licensed under the [MIT License](LICENSE).
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=petiky/packycc&type=Date)](https://star-history.com/#petiky/packycc&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=zhangjintao950326/packycc&type=Date)](https://star-history.com/#zhangjintao950326/packycc&Date)
